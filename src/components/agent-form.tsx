@@ -1,21 +1,40 @@
 "use client";
-import { useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/utils/utils";
+import {
+  ChevronRight,
+  Sparkles,
+  Loader2,
+  Trash2,
+  X,
+  Link2,
+  Calendar,
+  Plus,
+  RefreshCcw,
+} from "lucide-react";
 
 const Payload = z.object({
   topic: z.string().min(2),
-  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  start_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  end_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
   title: z.string().min(2),
   intro: z.string().optional(),
   newsletter_type: z.string().optional(),
   features: z.array(z.string()).optional(),
-  links: z.array(z.string()).optional(),
+  links: z.array(z.string().url("Link must be a valid URL")).optional(),
   location: z.string().optional(),
   content: z.string().optional(),
   key_details: z.string().optional(),
@@ -29,7 +48,6 @@ type Props = {
   onStreamRun: (payload: any) => Promise<void>;
 };
 
-// Newsletter presets
 const NEWSLETTER_PRESETS = {
   tech: {
     title: "Tech Weekly",
@@ -38,7 +56,7 @@ const NEWSLETTER_PRESETS = {
     newsletter_type: "technology",
     features: ["product launches", "industry news", "developer tools"],
     tone: ["professional", "informative"],
-    sections: 4
+    sections: 4,
   },
   business: {
     title: "Business Brief",
@@ -47,7 +65,7 @@ const NEWSLETTER_PRESETS = {
     newsletter_type: "business",
     features: ["market analysis", "company news", "financial updates"],
     tone: ["analytical", "formal"],
-    sections: 3
+    sections: 3,
   },
   lifestyle: {
     title: "Lifestyle Weekly",
@@ -56,7 +74,7 @@ const NEWSLETTER_PRESETS = {
     newsletter_type: "lifestyle",
     features: ["health tips", "travel guides", "food reviews"],
     tone: ["friendly", "engaging"],
-    sections: 5
+    sections: 5,
   },
   education: {
     title: "Learning Digest",
@@ -65,27 +83,121 @@ const NEWSLETTER_PRESETS = {
     newsletter_type: "education",
     features: ["tutorials", "research findings", "skill development"],
     tone: ["educational", "clear"],
-    sections: 4
-  }
-};
+    sections: 4,
+  },
+} as const;
+
+type PresetKey = keyof typeof NEWSLETTER_PRESETS;
 
 const NEWSLETTER_TYPES = [
-  "technology", "business", "lifestyle", "education", "news", 
-  "entertainment", "sports", "health", "finance", "travel", "food", "fashion"
-];
+  "technology",
+  "business",
+  "lifestyle",
+  "education",
+  "news",
+  "entertainment",
+  "sports",
+  "health",
+  "finance",
+  "travel",
+  "food",
+  "fashion",
+] as const;
 
 const FEATURE_OPTIONS = [
-  "product launches", "industry news", "developer tools", "market analysis",
-  "company news", "financial updates", "health tips", "travel guides",
-  "food reviews", "tutorials", "research findings", "skill development",
-  "interviews", "reviews", "opinions", "events", "announcements"
-];
+  "product launches",
+  "industry news",
+  "developer tools",
+  "market analysis",
+  "company news",
+  "financial updates",
+  "health tips",
+  "travel guides",
+  "food reviews",
+  "tutorials",
+  "research findings",
+  "skill development",
+  "interviews",
+  "reviews",
+  "opinions",
+  "events",
+  "announcements",
+] as const;
 
 const TONE_OPTIONS = [
-  "professional", "informative", "analytical", "formal", "friendly",
-  "engaging", "educational", "clear", "warm", "expert", "concise",
-  "practical", "playful", "crisp", "casual", "authoritative"
-];
+  "professional",
+  "informative",
+  "analytical",
+  "formal",
+  "friendly",
+  "engaging",
+  "educational",
+  "clear",
+  "warm",
+  "expert",
+  "concise",
+  "practical",
+  "playful",
+  "crisp",
+  "casual",
+  "authoritative",
+] as const;
+
+// Small building blocks ---------------------------------
+const SectionTitle = ({
+  title,
+  description,
+}: {
+  title: string;
+  description?: string;
+}) => {
+  return (
+    <div className="flex flex-col gap-1">
+      <h3 className="text-[15px] font-semibold text-zinc-900">{title}</h3>
+      {description ? (
+        <p className="text-[13px] text-zinc-500 leading-snug">{description}</p>
+      ) : null}
+    </div>
+  );
+};
+
+const Field = ({
+  label,
+  hint,
+  error,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  error?: string | null;
+  children: React.ReactNode;
+}) => {
+  return (
+    <div className="grid gap-1.5">
+      <Label className="text-[13px] text-zinc-700">{label}</Label>
+      {children}
+      {hint && !error ? (
+        <p className="text-[12px] text-zinc-500">{hint}</p>
+      ) : null}
+      {error ? <p className="text-[12px] text-red-600">{error}</p> : null}
+    </div>
+  );
+};
+
+function Chip({ text, onRemove }: { text: string; onRemove: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[12px] bg-white/60 shadow-sm">
+      {text}
+      <button
+        type="button"
+        onClick={onRemove}
+        className="opacity-60 hover:opacity-100"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </span>
+  );
+}
 
 const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
   const [topic, setTopic] = useState("dev tools");
@@ -102,67 +214,23 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
   const [tone, setTone] = useState<string[]>([]);
   const [sections, setSections] = useState<number | "">("");
   const [preset, setPreset] = useState("");
+
   const [newFeature, setNewFeature] = useState("");
   const [newLink, setNewLink] = useState("");
   const [newTone, setNewTone] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState<"none" | "run" | "stream">(
+    "none"
+  );
 
-  // Helper functions for managing arrays
-  const addFeature = () => {
-    if (newFeature.trim() && !features.includes(newFeature.trim())) {
-      setFeatures([...features, newFeature.trim()]);
-      setNewFeature("");
-    }
-  };
-
-  const removeFeature = (feature: string) => {
-    setFeatures(features.filter(f => f !== feature));
-  };
-
-  const addLink = () => {
-    if (newLink.trim() && !links.includes(newLink.trim())) {
-      setLinks([...links, newLink.trim()]);
-      setNewLink("");
-    }
-  };
-
-  const removeLink = (link: string) => {
-    setLinks(links.filter(l => l !== link));
-  };
-
-  const addTone = () => {
-    if (newTone.trim() && !tone.includes(newTone.trim())) {
-      setTone([...tone, newTone.trim()]);
-      setNewTone("");
-    }
-  };
-
-  const removeTone = (toneItem: string) => {
-    setTone(tone.filter(t => t !== toneItem));
-  };
-
-  const applyPreset = (presetKey: string) => {
-    const selectedPreset = NEWSLETTER_PRESETS[presetKey as keyof typeof NEWSLETTER_PRESETS];
-    if (selectedPreset) {
-      setTitle(selectedPreset.title);
-      setTopic(selectedPreset.topic);
-      setIntro(selectedPreset.intro);
-      setNewsletterType(selectedPreset.newsletter_type);
-      setFeatures(selectedPreset.features);
-      setTone(selectedPreset.tone);
-      setSections(selectedPreset.sections);
-      setPreset(presetKey);
-    }
-  };
-
-  function buildPayload() {
+  const payload = useMemo(() => {
     const data = {
       topic,
-      start_date: start || undefined,
-      end_date: end || undefined,
+      start_date: start,
+      end_date: end,
       title,
-      intro: intro || undefined,
-      newsletter_type: newsletterType || undefined,
+      intro: intro,
+      newsletter_type: newsletterType,
       features: features.length > 0 ? features : undefined,
       links: links.length > 0 ? links : undefined,
       location: location || undefined,
@@ -172,287 +240,558 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
       sections: sections === "" ? undefined : Number(sections),
       preset: preset || undefined,
     };
-    const parse = Payload.safeParse(data);
-    if (!parse.success) {
-      throw new Error(parse.error.issues.map((i) => i.message).join("; "));
+    return data;
+  }, [
+    topic,
+    start,
+    end,
+    title,
+    intro,
+    newsletterType,
+    features,
+    links,
+    location,
+    content,
+    keyDetails,
+    tone,
+    sections,
+    preset,
+  ]);
+
+  const parse = Payload.safeParse(payload);
+  const canSubmit = parse.success;
+  const parseErrors: Record<string, string> = useMemo(() => {
+    if (parse.success) return {};
+    const dict: Record<string, string> = {};
+    for (const issue of parse.error.issues) {
+      const key = (issue.path?.[0] as string) ?? "root";
+      dict[key] = issue.message;
     }
-    return parse.data;
-  }
+    return dict;
+  }, [parse]);
+
+  const applyPreset = useCallback((k: PresetKey) => {
+    const p = NEWSLETTER_PRESETS[k];
+    setTitle(p.title);
+    setTopic(p.topic);
+    setIntro(p.intro);
+    setNewsletterType(p.newsletter_type);
+    setFeatures([...p.features]);
+    setTone([...p.tone]);
+    setSections(p.sections);
+    setPreset(k);
+  }, []);
+
+  const addFeature = () => {
+    const v = newFeature.trim();
+    if (!v) return;
+    if (!features.includes(v)) setFeatures([...features, v]);
+    setNewFeature("");
+  };
+  const removeFeature = (v: string) =>
+    setFeatures(features.filter((f) => f !== v));
+
+  const addTone = () => {
+    const v = newTone.trim();
+    if (!v) return;
+    if (!tone.includes(v)) setTone([...tone, v]);
+    setNewTone("");
+  };
+  const removeTone = (v: string) => setTone(tone.filter((t) => t !== v));
+
+  const addLink = () => {
+    const v = newLink.trim();
+    if (!v) return;
+    try {
+      const u = new URL(v);
+      const normalized = u.toString();
+      if (!links.includes(normalized)) setLinks([...links, normalized]);
+      setNewLink("");
+    } catch {
+      setError("Please enter a valid URL (https://…)");
+    }
+  };
+  const removeLink = (v: string) => setLinks(links.filter((l) => l !== v));
+
+  const clearAll = () => {
+    setTopic("dev tools");
+    setStart("2025-01-15");
+    setEnd("2025-01-22");
+    setTitle("Weekly Dev Digest");
+    setIntro("Hand-picked updates for the week.");
+    setNewsletterType("");
+    setFeatures([]);
+    setLinks([]);
+    setLocation("");
+    setContent("");
+    setKeyDetails("");
+    setTone([]);
+    setSections("");
+    setPreset("");
+    setError(null);
+  };
+
+  // Keyboard shortcuts -----------------------------------
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mac = navigator.platform.toLowerCase().includes("mac");
+      const mod = mac ? e.metaKey : e.ctrlKey;
+      if (mod && e.key === "Enter") {
+        e.preventDefault();
+        if (e.shiftKey) handleSubmit("stream");
+        else handleSubmit("run");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  // Submit -----------------------------------------------
+  const handleSubmit = async (mode: "run" | "stream") => {
+    setError(null);
+    const result = Payload.safeParse(payload);
+    if (!result.success) {
+      setError("Please fix the highlighted fields.");
+      return;
+    }
+    try {
+      setSubmitting(mode);
+      if (mode === "run") await onRun(result.data);
+      else await onStreamRun(result.data);
+    } catch (err: any) {
+      setError(String(err?.message || err));
+    } finally {
+      setSubmitting("none");
+    }
+  };
 
   return (
-    <Card>
-      <CardContent className="p-6 grid gap-4">
-        <div className="text-center mb-4">
-          <h2 className="text-2xl font-bold text-gray-800">Newsletter Drafting Tool</h2>
-          <p className="text-gray-600">Create comprehensive newsletters with enhanced customization</p>
-        </div>
-
-        <form
-          className="grid gap-4"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setError(null);
-            try {
-              const payload = buildPayload();
-              await onRun(payload);
-            } catch (err: any) {
-              setError(String(err.message || err));
-            }
-          }}
-        >
-          {/* Preset Templates */}
-          <div className="grid gap-2">
-            <Label className="text-lg font-semibold">Quick Start Templates</Label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              {Object.entries(NEWSLETTER_PRESETS).map(([key, presetData]) => (
-                <Button
-                  key={key}
-                  type="button"
-                  variant={preset === key ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => applyPreset(key)}
-                  className="text-xs"
-                >
-                  {presetData.title}
-                </Button>
-              ))}
+    <div className="mx-auto w-full max-w-6xl">
+      <div className="sticky top-0 z-10 -mx-2 backdrop-blur supports-[backdrop-filter]:bg-white/70">
+        <div className="px-2 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight text-zinc-900">
+                Newsletter Drafting Tool
+              </h2>
+              <p className="text-[13px] text-zinc-500">
+                Craft comprehensive documents and newsletters with sensible
+                defaults and clarity.
+              </p>
             </div>
-          </div>
-
-          {/* Basic Information */}
-          <div className="grid gap-3">
-            <h3 className="text-lg font-semibold text-gray-700 border-b pb-2">Basic Information</h3>
-            
-            <div className="grid gap-1">
-              <Label>Newsletter Title</Label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Enter newsletter title" />
-            </div>
-
-            <div className="grid gap-1">
-              <Label>Topic/Subject</Label>
-              <Input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g., technology, business, lifestyle" />
-            </div>
-
-            <div className="grid gap-1">
-              <Label>Newsletter Type</Label>
-              <select
-                className="border rounded h-10 px-3"
-                value={newsletterType}
-                onChange={(e) => setNewsletterType(e.target.value)}
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={clearAll} className="gap-2">
+                <RefreshCcw className="h-4 w-4" /> Reset
+              </Button>
+              <Button
+                className="gap-2"
+                disabled={!canSubmit || submitting !== "none"}
+                onClick={() => handleSubmit("run")}
               >
-                <option value="">Select newsletter type</option>
-                {NEWSLETTER_TYPES.map((type) => (
-                  <option key={type} value={type}>{type.charAt(0).toUpperCase() + type.slice(1)}</option>
-                ))}
-              </select>
+                {submitting === "run" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                Generate (⌘⏎)
+              </Button>
+              <Button
+                variant="secondary"
+                className="gap-2"
+                disabled={!canSubmit || submitting !== "none"}
+                onClick={() => handleSubmit("stream")}
+              >
+                {submitting === "stream" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                Stream (⇧⌘⏎)
+              </Button>
             </div>
+          </div>
+        </div>
+        <Separator />
+      </div>
 
-            <div className="grid gap-1">
-              <Label>Introduction</Label>
-              <textarea
-                className="border rounded p-3 min-h-[80px]"
-                value={intro}
-                onChange={(e) => setIntro(e.target.value)}
-                placeholder="Brief introduction or description of the newsletter"
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 px-2 py-6">
+        <Card className="col-span-2 border-zinc-200/70 shadow-sm">
+          <CardContent className="p-6 space-y-8">
+            <section className="space-y-3">
+              <SectionTitle
+                title="Quick Start Templates"
+                description="Start with a balanced baseline. You can refine everything later."
               />
-            </div>
-          </div>
-
-          {/* Date Range */}
-          <div className="grid gap-3">
-            <h3 className="text-lg font-semibold text-gray-700 border-b pb-2">Date Range</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-1">
-                <Label>Start Date</Label>
-                <Input 
-                  type="date" 
-                  value={start} 
-                  onChange={(e) => setStart(e.target.value)} 
-                />
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {(Object.keys(NEWSLETTER_PRESETS) as PresetKey[]).map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => applyPreset(key)}
+                    className={cn(
+                      "group rounded-xl border p-3 text-left transition hover:shadow-sm",
+                      preset === key
+                        ? "border-zinc-900"
+                        : "border-zinc-200 hover:border-zinc-300"
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[13px] font-medium text-zinc-900">
+                        {NEWSLETTER_PRESETS[key].title}
+                      </span>
+                      <ChevronRight className="h-4 w-4 text-zinc-400 group-hover:text-zinc-600" />
+                    </div>
+                    <p className="mt-1 text-[12px] text-zinc-500 line-clamp-2">
+                      {NEWSLETTER_PRESETS[key].intro}
+                    </p>
+                  </button>
+                ))}
               </div>
-              <div className="grid gap-1">
-                <Label>End Date</Label>
-                <Input 
-                  type="date" 
-                  value={end} 
-                  onChange={(e) => setEnd(e.target.value)} 
-                />
-              </div>
-            </div>
-          </div>
+            </section>
 
-          {/* Content Features */}
-          <div className="grid gap-3">
-            <h3 className="text-lg font-semibold text-gray-700 border-b pb-2">Content Features</h3>
-            
-            <div className="grid gap-2">
-              <Label>Features (Content Types)</Label>
-              <div className="flex gap-2">
-                <select
-                  className="border rounded h-10 px-3 flex-1"
-                  value={newFeature}
-                  onChange={(e) => setNewFeature(e.target.value)}
+            <Separator />
+
+            <section className="space-y-4">
+              <SectionTitle title="Basic information" />
+              <div className="grid md:grid-cols-2 gap-4">
+                <Field label="Newsletter title" error={parseErrors.title}>
+                  <Input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Enter newsletter title"
+                  />
+                </Field>
+                <Field label="Topic / subject" error={parseErrors.topic}>
+                  <Input
+                    value={topic}
+                    onChange={(e) => setTopic(e.target.value)}
+                    placeholder="e.g., technology, business, lifestyle"
+                  />
+                </Field>
+              </div>
+              <div className="grid md:grid-cols-3 gap-4">
+                <Field
+                  label="Type"
+                  hint="Optional"
+                  error={parseErrors.newsletter_type}
                 >
-                  <option value="">Select a feature</option>
-                  {FEATURE_OPTIONS.map((feature) => (
-                    <option key={feature} value={feature}>{feature}</option>
-                  ))}
-                </select>
-                <Button type="button" onClick={addFeature} size="sm">Add</Button>
-              </div>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {features.map((feature) => (
-                  <Badge key={feature} variant="secondary" className="flex items-center gap-1">
-                    {feature}
-                    <button
-                      type="button"
-                      onClick={() => removeFeature(feature)}
-                      className="ml-1 text-xs hover:text-red-600"
-                    >
-                      ×
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Additional Information */}
-          <div className="grid gap-3">
-            <h3 className="text-lg font-semibold text-gray-700 border-b pb-2">Additional Information</h3>
-            
-            <div className="grid gap-1">
-              <Label>Location (Optional)</Label>
-              <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g., New York, Global, Local" />
-            </div>
-
-            <div className="grid gap-1">
-              <Label>Key Details</Label>
-              <textarea
-                className="border rounded p-3 min-h-[80px]"
-                value={keyDetails}
-                onChange={(e) => setKeyDetails(e.target.value)}
-                placeholder="Important details, highlights, or special notes"
-              />
-            </div>
-
-            <div className="grid gap-1">
-              <Label>Additional Content</Label>
-              <textarea
-                className="border rounded p-3 min-h-[80px]"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Any additional content, context, or specific requirements"
-              />
-            </div>
-          </div>
-
-          {/* Links */}
-          <div className="grid gap-3">
-            <h3 className="text-lg font-semibold text-gray-700 border-b pb-2">Links</h3>
-            <div className="grid gap-2">
-              <div className="flex gap-2">
-                <Input
-                  value={newLink}
-                  onChange={(e) => setNewLink(e.target.value)}
-                  placeholder="Add relevant links (URLs, resources, etc.)"
-                />
-                <Button type="button" onClick={addLink} size="sm">Add</Button>
-              </div>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {links.map((link) => (
-                  <Badge key={link} variant="outline" className="flex items-center gap-1">
-                    <a href={link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                      {link.length > 30 ? link.substring(0, 30) + "..." : link}
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => removeLink(link)}
-                      className="ml-1 text-xs hover:text-red-600"
-                    >
-                      ×
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Tone and Style */}
-          <div className="grid gap-3">
-            <h3 className="text-lg font-semibold text-gray-700 border-b pb-2">Tone and Style</h3>
-            
-            <div className="grid gap-2">
-              <Label>Tone (Multi-select)</Label>
-              <div className="flex gap-2">
-                <select
-                  className="border rounded h-10 px-3 flex-1"
-                  value={newTone}
-                  onChange={(e) => setNewTone(e.target.value)}
+                  <select
+                    className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-[14px] text-zinc-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+                    value={newsletterType}
+                    onChange={(e) => setNewsletterType(e.target.value)}
+                  >
+                    <option value="">Select type</option>
+                    {NEWSLETTER_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {t.charAt(0).toUpperCase() + t.slice(1)}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field
+                  label="Sections"
+                  hint="2–8 (optional)"
+                  error={parseErrors.sections}
                 >
-                  <option value="">Select tone</option>
-                  {TONE_OPTIONS.map((toneOption) => (
-                    <option key={toneOption} value={toneOption}>{toneOption}</option>
-                  ))}
-                </select>
-                <Button type="button" onClick={addTone} size="sm">Add</Button>
+                  <Input
+                    type="number"
+                    min={2}
+                    max={8}
+                    placeholder="4"
+                    value={sections as number | ""}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setSections(
+                        v === "" ? "" : Math.max(2, Math.min(8, Number(v)))
+                      );
+                    }}
+                  />
+                </Field>
+                <div className="hidden md:block" />
               </div>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {tone.map((toneItem) => (
-                  <Badge key={toneItem} variant="secondary" className="flex items-center gap-1">
-                    {toneItem}
-                    <button
-                      type="button"
-                      onClick={() => removeTone(toneItem)}
-                      className="ml-1 text-xs hover:text-red-600"
-                    >
-                      ×
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            </div>
+              <Field
+                label="Introduction"
+                hint="A short welcome or description for the top of your document."
+              >
+                <textarea
+                  className="min-h-[88px] w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-[14px] text-zinc-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+                  value={intro}
+                  onChange={(e) => setIntro(e.target.value)}
+                  placeholder="Brief introduction or description"
+                />
+              </Field>
+            </section>
 
-            <div className="grid gap-1">
-              <Label>Sections (2–8, optional)</Label>
-              <Input
-                type="number"
-                min={2}
-                max={8}
-                placeholder="4"
-                value={sections as number | ""}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setSections(v === "" ? "" : Math.max(2, Math.min(8, Number(v))));
-                }}
+            <Separator />
+
+            <section className="space-y-4">
+              <SectionTitle
+                title="Date range"
+                description="Use this to bound sources or summaries for your generator."
               />
-            </div>
-          </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <Field label="Start date" error={parseErrors.start_date}>
+                  <div className="relative">
+                    <Input
+                      type="date"
+                      value={start}
+                      onChange={(e) => setStart(e.target.value)}
+                    />
+                    <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                  </div>
+                </Field>
+                <Field label="End date" error={parseErrors.end_date}>
+                  <div className="relative">
+                    <Input
+                      type="date"
+                      value={end}
+                      onChange={(e) => setEnd(e.target.value)}
+                    />
+                    <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                  </div>
+                </Field>
+              </div>
+            </section>
 
-          {error && <p className="text-red-600 text-sm bg-red-50 p-3 rounded">{error}</p>}
+            <Separator />
 
-          <div className="flex gap-3 pt-4">
-            <Button type="submit" className="flex-1">Generate Newsletter</Button>
-            <Button
-              type="button"
-              variant="secondary"
-              className="flex-1"
-              onClick={async () => {
-                setError(null);
-                try {
-                  const payload = buildPayload();
-                  await onStreamRun(payload);
-                } catch (err: any) {
-                  setError(String(err.message || err));
-                }
-              }}
-            >
-              Stream Generate
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+            <section className="space-y-4">
+              <SectionTitle title="Content structure & tone" />
+              <div className="grid md:grid-cols-2 gap-4">
+                <Field
+                  label="Add a feature"
+                  hint="Select from common options or type your own and press Enter."
+                >
+                  <div className="flex gap-2">
+                    <select
+                      className="h-10 flex-1 rounded-md border border-zinc-200 bg-white px-3 text-[14px] text-zinc-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+                      value={newFeature}
+                      onChange={(e) => setNewFeature(e.target.value)}
+                    >
+                      <option value="">Select a feature</option>
+                      {FEATURE_OPTIONS.map((f) => (
+                        <option key={f} value={f}>
+                          {f}
+                        </option>
+                      ))}
+                    </select>
+                    <Button
+                      type="button"
+                      onClick={addFeature}
+                      className="gap-1"
+                    >
+                      <Plus className="h-4 w-4" /> Add
+                    </Button>
+                  </div>
+                  {features.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {features.map((f) => (
+                        <Chip
+                          key={f}
+                          text={f}
+                          onRemove={() => removeFeature(f)}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                </Field>
+
+                <Field
+                  label="Add a tone"
+                  hint="Multi-select; you can mix e.g. ‘concise’ + ‘warm’."
+                >
+                  <div className="flex gap-2">
+                    <select
+                      className="h-10 flex-1 rounded-md border border-zinc-200 bg-white px-3 text-[14px] text-zinc-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+                      value={newTone}
+                      onChange={(e) => setNewTone(e.target.value)}
+                    >
+                      <option value="">Select tone</option>
+                      {TONE_OPTIONS.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                    <Button type="button" onClick={addTone} className="gap-1">
+                      <Plus className="h-4 w-4" /> Add
+                    </Button>
+                  </div>
+                  {tone.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {tone.map((t) => (
+                        <Chip key={t} text={t} onRemove={() => removeTone(t)} />
+                      ))}
+                    </div>
+                  ) : null}
+                </Field>
+              </div>
+            </section>
+
+            <Separator />
+
+            <section className="space-y-4">
+              <SectionTitle title="Additional details" />
+              <div className="grid md:grid-cols-2 gap-4">
+                <Field label="Location (optional)">
+                  <Input
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="e.g., New York, Global"
+                  />
+                </Field>
+                <div />
+              </div>
+              <Field label="Key details">
+                <textarea
+                  className="min-h-[80px] w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-[14px] text-zinc-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+                  value={keyDetails}
+                  onChange={(e) => setKeyDetails(e.target.value)}
+                  placeholder="Highlights, constraints, or must-include notes"
+                />
+              </Field>
+              <Field label="Additional content">
+                <textarea
+                  className="min-h-[96px] w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-[14px] text-zinc-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder="Any context or specific requirements"
+                />
+              </Field>
+            </section>
+
+            <Separator />
+
+            <section className="space-y-4">
+              <SectionTitle
+                title="Links"
+                description="Add sources or references (validated URLs)."
+              />
+              <Field
+                label="Add a link"
+                hint="Paste a full URL and press Add."
+                error={parseErrors.links}
+              >
+                <div className="flex gap-2">
+                  <Input
+                    value={newLink}
+                    onChange={(e) => setNewLink(e.target.value)}
+                    placeholder="https://example.com/article"
+                  />
+                  <Button type="button" onClick={addLink} className="gap-1">
+                    <Link2 className="h-4 w-4" /> Add
+                  </Button>
+                </div>
+              </Field>
+              {links.length > 0 ? (
+                <div className="flex flex-col gap-2">
+                  {links.map((l) => {
+                    const host = (() => {
+                      try {
+                        return new URL(l).hostname;
+                      } catch {
+                        return l;
+                      }
+                    })();
+                    return (
+                      <div
+                        key={l}
+                        className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 text-[14px] shadow-sm"
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-zinc-100 text-[11px] text-zinc-600">
+                            ↗
+                          </span>
+                          <a
+                            href={l}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="truncate text-zinc-900 hover:underline"
+                            title={l}
+                          >
+                            {host}
+                          </a>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeLink(l)}
+                          className="rounded p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </section>
+
+            {error ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+                {error}
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        <div className="lg:col-span-1">
+          <Card className="sticky top-[80px] border-zinc-200/70 shadow-sm">
+            <CardContent className="p-6 space-y-4">
+              <h4 className="text-[15px] font-semibold text-zinc-900">
+                Live summary
+              </h4>
+              <div className="grid gap-2 text-[13px]">
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-500">Preset</span>
+                  <span>{preset || "—"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-500">Type</span>
+                  <span>{newsletterType || "—"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-500">Sections</span>
+                  <span>{sections || "—"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-500">Features</span>
+                  <span>{features.length || 0}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-500">Tones</span>
+                  <span>{tone.length || 0}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-500">Links</span>
+                  <span>{links.length || 0}</span>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <h5 className="text-[13px] font-medium text-zinc-700">
+                  Payload preview
+                </h5>
+                <pre className="max-h-[320px] overflow-auto rounded-lg bg-zinc-50 p-3 text-[12px] leading-relaxed text-zinc-800">
+                  {JSON.stringify(payload, null, 2)}
+                </pre>
+              </div>
+
+              {!canSubmit ? (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+                  Some fields need attention before generating.
+                </div>
+              ) : (
+                <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-800">
+                  Looks good! Ready to generate.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
   );
 };
 
