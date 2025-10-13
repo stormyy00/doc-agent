@@ -7,6 +7,8 @@ import {
   toolSummarize,
   toolGenerateEmail,
   toolSendEmail,
+  toolSetFooter,
+  toolGetFooter,
 } from "@/utils/tools";
 import {
   buildOutline,
@@ -114,6 +116,48 @@ export const POST = async (req: NextRequest) => {
         return out;
       } catch (error) {
         logger.toolError("summarize", error, toolId);
+        throw error;
+      }
+    },
+  }),
+
+  // Footer tools (mock-backed)
+  set_footer: tool({
+    description: "Set or update the footer settings used in generated newsletters.",
+    inputSchema: z.object({
+      orgName: z.string().optional(),
+      addressLine1: z.string().optional(),
+      addressLine2: z.string().optional(),
+      unsubscribeUrl: z.string().url().optional(),
+      websiteUrl: z.string().url().optional(),
+      twitterUrl: z.string().url().optional(),
+      linkedinUrl: z.string().url().optional(),
+      customHtml: z.string().optional(),
+      reset: z.boolean().optional(),
+    }),
+    execute: async (args) => {
+      const toolId = logger.toolCall("set_footer", args);
+      try {
+        const out = await toolSetFooter(args as any);
+        logger.toolResult("set_footer", out, toolId, true);
+        return out;
+      } catch (error) {
+        logger.toolError("set_footer", error, toolId);
+        throw error;
+      }
+    },
+  }),
+  get_footer: tool({
+    description: "Get the current footer settings and rendered HTML snippet.",
+    inputSchema: z.object({}).optional(),
+    execute: async () => {
+      const toolId = logger.toolCall("get_footer", {});
+      try {
+        const out = await toolGetFooter();
+        logger.toolResult("get_footer", out, toolId, true);
+        return out;
+      } catch (error) {
+        logger.toolError("get_footer", error, toolId);
         throw error;
       }
     },
@@ -266,7 +310,10 @@ export const POST = async (req: NextRequest) => {
 
         const r = await generateText({
           model,
-          system: "You are a professional newsletter writer. Create a complete, well-structured HTML newsletter document with proper styling, sections, and engaging content.",
+          system: [
+            "You are a professional newsletter writer. Create a complete, well-structured HTML newsletter document with proper styling, sections, and engaging content.",
+            "Do NOT include any legal disclaimers, unsubscribe links, or footers in the body. A standard/custom footer is appended automatically downstream.",
+          ].join("\n"),
           prompt,
           temperature: 0.4,
         });
@@ -276,7 +323,17 @@ export const POST = async (req: NextRequest) => {
         const htmlMatch =
           r.text.match(/<!doctype html[\s\S]*<\/html>/i) ||
           r.text.match(/<html[\s\S]*<\/html>/i);
-        const html = (htmlMatch ? htmlMatch[0] : r.text).trim();
+        let html = (htmlMatch ? htmlMatch[0] : r.text).trim();
+        // Append custom footer if missing
+        try {
+          const { html: footerHtml } = await toolGetFooter();
+          if (footerHtml) {
+            const hasFooter = /<footer[\s>]/i.test(html);
+            if (!hasFooter) {
+              html = html.replace(/<\/body>/i, `${footerHtml}\n</body>`);
+            }
+          }
+        } catch {}
         const out = { html };
         logger.toolResult("write_newsletter", { html_len: html.length }, toolId, true);
         return out;
@@ -337,17 +394,10 @@ export const POST = async (req: NextRequest) => {
   const result = await generateText({
     model,
     system: [
-      "You are a professional newsletter agent that creates high-quality, data-driven newsletters.",
-      "IMPORTANT: You MUST use the structured workflow for the best results. Do NOT skip to write_newsletter() immediately.",
-      "REQUIRED workflow (follow these steps in order):",
-      "1. ALWAYS start by calling fetch_sources() to get recent, relevant content for the topic and date range",
-      "2. Then call summarize() to create concise summaries of the fetched content",
-      "3. Next, call build_outline() to create a structured outline based on the topic and sections",
-      "4. Then call compose_sections() to write full sections using the outline and summaries",
-      "5. Optionally call pick_ctas() to suggest relevant call-to-action items",
-      "6. Finally, call generate_email() to create the final HTML newsletter",
-      "Only use write_newsletter() as a last resort fallback if the structured approach completely fails.",
-      "The structured approach produces much better, more factual newsletters with real data and proper organization.",
+      "You are a professional newsletter agent that creates high-quality newsletters.",
+      "Default to calling write_newsletter(...) exactly once to produce the final HTML.",
+      "You may call generate_email(...) if items or pre-drafted sections are provided.",
+      "You can call get_footer() to view the current footer and set_footer() if the user wants to customize it; the footer is automatically appended when rendering emails.",
       "Never finish without returning an HTML document.",
     ].join("\n"),
     messages: [{
@@ -399,7 +449,9 @@ export const POST = async (req: NextRequest) => {
     html_len: html?.length ?? 0,
   });
 
-  // … your direct-writer guardrail and summaries→generate fallback (log both)
+  // No source fetching: keep it simple and prefer direct writer
+
+  // Last resort: direct writer
   if (!html) {
     logger.step("guardrail:writer:direct");
     try {
@@ -424,42 +476,9 @@ export const POST = async (req: NextRequest) => {
       html = direct.html;
       logger.info("guardrail:writer:ok", { html_len: html?.length ?? 0 });
     } catch (e) {
-      logger.warn("guardrail:writer:failed", { err: String(e) });
-    }
-  }
-
-  if (!html) {
-    logger.step("fallback:summaries->generate_email");
-    try {
-      let { items } = await toolFetchSources({ topic: data.topic, start_date: data.start_date, end_date: data.end_date });
-      if (!items?.length) {
-        const retry = await toolFetchSources({ topic: "", start_date: data.start_date, end_date: data.end_date });
-        items = retry.items;
-      }
-      const { summaries } = await toolSummarize({ items, max_chars: 400 });
-      const toneValue = data.tone;
-      const toneString = Array.isArray(toneValue) ? toneValue.join(", ") : toneValue;
-      
-      const out = await toolGenerateEmail({
-        title: data.title,
-        intro: data.intro || `Curated updates on ${data.topic}.`,
-        newsletter_type: data.newsletter_type,
-        features: data.features,
-        links: data.links,
-        location: data.location,
-        content: data.content,
-        key_details: data.key_details,
-        tone: toneString,
-        sections: data.sections,
-        preset: data.preset,
-        items: summaries,
-      } as any);
-      html = out.html;
-      logger.info("fallback:ok", { items: items?.length ?? 0, html_len: html?.length ?? 0 });
-    } catch (e) {
-      logger.error("fallback:failed", { err: String(e) });
+      logger.error("guardrail:writer:failed", { err: String(e) });
       return new Response(
-        JSON.stringify({ error: "No HTML produced by the agent and fallback failed.", steps }),
+        JSON.stringify({ error: "No HTML produced by the agent and all fallbacks failed.", steps }),
         { status: 502 }
       );
     }

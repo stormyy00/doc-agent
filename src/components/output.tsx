@@ -4,9 +4,10 @@ import { useState } from "react";
 import RunAgentForm from "@/components/agent-form";
 import { readUIMessageStream } from "ai";
 import { Spinner } from "./ui/spinner";
-import LogCard  from "./logs";
+import LogCard from "./logs";
 import EnhancedLogCard from "./enhanced-logs";
 import { LogEntry } from "@/types/log";
+import ResultDocument from "./result-document";
 
 const Output = () => {
   const [html, setHtml] = useState<string | null>(null);
@@ -16,6 +17,8 @@ const Output = () => {
   const [totalDuration, setTotalDuration] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [sendSubject, setSendSubject] = useState("");
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -41,6 +44,7 @@ const Output = () => {
               setError(json?.error || "Request failed");
             } else {
               setHtml(json.html ?? null);
+              if (!sendSubject) setSendSubject(payload.title || "");
               // Set enhanced logs from API response
               if (Array.isArray(json?.logs)) {
                 setEnhancedLogs(json.logs);
@@ -52,7 +56,7 @@ const Output = () => {
                 setTotalDuration(json.totalDuration);
               }
             }
-           if (Array.isArray(json?.debug)) setLog(json.debug);
+            if (Array.isArray(json?.debug)) setLog(json.debug);
           } catch (e: any) {
             setError(String(e?.message || e));
           } finally {
@@ -81,8 +85,10 @@ const Output = () => {
 
             let sawHtml = false;
 
-            // ✅ pass the whole Response, not res.body
-            for await (const msg of readUIMessageStream(res)) {
+            // Use the response body stream to satisfy types
+            for await (const msg of readUIMessageStream({
+              stream: (res as any).body,
+            } as any) as any) {
               if (msg.type === "start") setLog((l) => [...l, "start"]);
               if (msg.type === "start-step")
                 setLog((l) => [...l, "start-step"]);
@@ -103,7 +109,7 @@ const Output = () => {
                 }
               }
 
-              for (const part of msg.parts ?? []) {
+              for (const part of (msg as any).parts ?? []) {
                 if (part.type === "tool-invocation") {
                   setLog((l) => [...l, `tool-call: ${part.toolName}`]);
                 }
@@ -119,6 +125,7 @@ const Output = () => {
                   ) {
                     sawHtml = true;
                     setHtml(part.result.html);
+                    if (!sendSubject) setSendSubject(payload.title || "");
                   }
                 }
                 // optionally show text tokens:
@@ -141,17 +148,18 @@ const Output = () => {
       {error && <p className="mt-2 text-red-600">{error}</p>}
 
       {html && (
-        <>
-          <h2 className="text-xl font-semibold mt-6">Preview</h2>
-          <iframe className="w-full h-[600px] border mt-2" srcDoc={html} />
-        </>
+        <ResultDocument
+          html={html}
+          setError={setError}
+          sendSubject={sendSubject}
+          setSendSubject={setSendSubject}
+        />
       )}
 
-  
       {enhancedLogs.length > 0 && (
         <div className="mt-6">
-          <EnhancedLogCard 
-            title="Enhanced Agent Logs" 
+          <EnhancedLogCard
+            title="Enhanced Agent Logs"
             logs={enhancedLogs}
             logStats={logStats}
             totalDuration={totalDuration || undefined}
@@ -159,7 +167,6 @@ const Output = () => {
         </div>
       )}
 
-     
       {log.length > 0 && (
         <details className="mt-4">
           <summary className="cursor-pointer text-sm font-medium text-muted-foreground">

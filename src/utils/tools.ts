@@ -11,6 +11,52 @@ const USE_MOCK = process.env.MOCK_TOOLS === "true" || true; // Default to mock f
 const FLASK_URL = process.env.FLASK_URL || "http://localhost:5001";
 
 /** ---------- MOCK DATA + HELPERS ---------- **/
+type FooterSettings = {
+  orgName: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  unsubscribeUrl?: string;
+  websiteUrl?: string;
+  twitterUrl?: string;
+  linkedinUrl?: string;
+  style?: string; // inline CSS applied to footer wrapper
+  customHtml?: string; // if provided, used as-is (trusted in mock only)
+};
+
+let MOCK_FOOTER_SETTINGS: FooterSettings = {
+  orgName: "Acme Publishing Co.",
+  addressLine1: "123 Market Street",
+  addressLine2: "San Francisco, CA 94105",
+  unsubscribeUrl: "https://example.com/unsubscribe",
+  websiteUrl: "https://example.com",
+  twitterUrl: "https://twitter.com/example",
+  linkedinUrl: "https://linkedin.com/company/example",
+  style: "color:#666;font-size:12px;line-height:1.4;",
+};
+
+function renderFooterHtml(settings: FooterSettings): string {
+  if (settings.customHtml) return settings.customHtml;
+  const lines: string[] = [];
+  lines.push(`<strong>${escapeHtml(settings.orgName)}</strong>`);
+  if (settings.addressLine1) lines.push(escapeHtml(settings.addressLine1));
+  if (settings.addressLine2) lines.push(escapeHtml(settings.addressLine2));
+  const links: string[] = [];
+  if (settings.websiteUrl) links.push(`<a href="${escapeHtml(settings.websiteUrl)}" target="_blank">Website</a>`);
+  if (settings.twitterUrl) links.push(`<a href="${escapeHtml(settings.twitterUrl)}" target="_blank">Twitter</a>`);
+  if (settings.linkedinUrl) links.push(`<a href="${escapeHtml(settings.linkedinUrl)}" target="_blank">LinkedIn</a>`);
+  const linksHtml = links.length ? `<div style="margin-top:6px;">${links.join(" · ")}</div>` : "";
+  const unsub = settings.unsubscribeUrl
+    ? `<div style="margin-top:6px;font-size:12px;">You can <a href="${escapeHtml(settings.unsubscribeUrl)}" target="_blank">unsubscribe here</a>.</div>`
+    : "";
+  const style = `margin-top:16px;${settings.style || "color:#666;font-size:12px;line-height:1.4;"}`;
+  return `
+  <hr/>
+  <footer style="${style}">
+    <div>${lines.join("<br/>")}</div>
+    ${linksHtml}
+    ${unsub}
+  </footer>`;
+}
 const MOCK_POSTS: Post[] = [
   {
     id: 1,
@@ -289,6 +335,7 @@ export const toolGenerateEmail = async (args: {
       <h3>Keep going</h3>
       ${ctas.map(c => `<p><strong>${escapeHtml(c.title)}:</strong> ${escapeHtml(c.text)} <a href="${c.url}">→</a></p>`).join("")}
     </section>` : ""}
+  ${renderFooterHtml(MOCK_FOOTER_SETTINGS)}
 </body></html>`;
     return { html };
   }
@@ -320,6 +367,32 @@ export const toolSendEmail = async (args: {
   });
   if (!res.ok) throw new Error("send_email failed");
   return res.json();
+};
+
+/** Footer management tools (mock) **/
+export const toolSetFooter = async (args: Partial<FooterSettings> & { reset?: boolean }) => {
+  if (!USE_MOCK) {
+    // In a real implementation, forward to backend service
+    // For now, mirror mock behavior client-side
+  }
+  if (args.reset) {
+    MOCK_FOOTER_SETTINGS = {
+      orgName: "Acme Publishing Co.",
+      addressLine1: "123 Market Street",
+      addressLine2: "San Francisco, CA 94105",
+      unsubscribeUrl: "https://example.com/unsubscribe",
+      websiteUrl: "https://example.com",
+      twitterUrl: "https://twitter.com/example",
+      linkedinUrl: "https://linkedin.com/company/example",
+    };
+  } else {
+    MOCK_FOOTER_SETTINGS = { ...MOCK_FOOTER_SETTINGS, ...args };
+  }
+  return { ok: true, settings: MOCK_FOOTER_SETTINGS, html: renderFooterHtml(MOCK_FOOTER_SETTINGS) };
+};
+
+export const toolGetFooter = async () => {
+  return { settings: MOCK_FOOTER_SETTINGS, html: renderFooterHtml(MOCK_FOOTER_SETTINGS) };
 };
 
 /** ---------- tiny util ---------- **/
