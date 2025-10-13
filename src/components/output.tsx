@@ -155,7 +155,6 @@ const Output = () => {
             logs={enhancedLogs}
             logStats={logStats}
             totalDuration={totalDuration || undefined}
-            maxHeight={500}
           />
         </div>
       )}
