@@ -19,9 +19,10 @@ import {
   Plus,
   RefreshCcw,
 } from "lucide-react";
+import Select from "./select";
 
 const Payload = z.object({
-  topic: z.string().min(2),
+  topic: z.string().min(2, "Topic must be at least 2 characters"),
   start_date: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -30,7 +31,7 @@ const Payload = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
-  title: z.string().min(2),
+  title: z.string().min(2, "Title must be at least 2 characters"),
   intro: z.string().optional(),
   newsletter_type: z.string().optional(),
   features: z.array(z.string()).optional(),
@@ -39,7 +40,7 @@ const Payload = z.object({
   content: z.string().optional(),
   key_details: z.string().optional(),
   tone: z.array(z.string()).optional(),
-  sections: z.number().int().min(2).max(8).optional(),
+  sections: z.number().int().min(2, "Must be at least 2").max(8, "Must be at most 8").optional(),
   preset: z.string().optional(),
 });
 
@@ -200,20 +201,36 @@ function Chip({ text, onRemove }: { text: string; onRemove: () => void }) {
 }
 
 const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
-  const [topic, setTopic] = useState("dev tools");
-  const [start, setStart] = useState("2025-01-15");
-  const [end, setEnd] = useState("2025-01-22");
-  const [title, setTitle] = useState("Weekly Dev Digest");
-  const [intro, setIntro] = useState("Hand-picked updates for the week.");
-  const [newsletterType, setNewsletterType] = useState("");
-  const [features, setFeatures] = useState<string[]>([]);
-  const [links, setLinks] = useState<string[]>([]);
-  const [location, setLocation] = useState("");
-  const [content, setContent] = useState("");
-  const [keyDetails, setKeyDetails] = useState("");
-  const [tone, setTone] = useState<string[]>([]);
-  const [sections, setSections] = useState<number | "">("");
-  const [preset, setPreset] = useState("");
+  const [object, setObject] = useState({
+    topic: "dev tools",
+    start: "2025-01-15",
+    end: "2025-01-22",
+    title: "Weekly Dev Digest",
+    intro: "Hand-picked updates for the week.",
+    newsletterType: "",
+    features: [] as string[],
+    links: [] as string[],
+    location: "",
+    content: "",
+    keyDetails: "",
+    tone: [] as string[],
+    sections: "" as number | "",
+    preset: "",
+  });
+  // const [topic, setTopic] = useState("dev tools");
+  // const [start, setStart] = useState("2025-01-15");
+  // const [end, setEnd] = useState("2025-01-22");
+  // const [title, setTitle] = useState("Weekly Dev Digest");
+  // const [intro, setIntro] = useState("Hand-picked updates for the week.");
+  // const [newsletterType, setNewsletterType] = useState("");
+  // const [features, setFeatures] = useState<string[]>([]);
+  // const [links, setLinks] = useState<string[]>([]);
+  // const [location, setLocation] = useState("");
+  // const [content, setContent] = useState("");
+  // const [keyDetails, setKeyDetails] = useState("");
+  // const [tone, setTone] = useState<string[]>([]);
+  // const [sections, setSections] = useState<number | "">("");
+  // const [preset, setPreset] = useState("");
 
   const [newFeature, setNewFeature] = useState("");
   const [newLink, setNewLink] = useState("");
@@ -225,37 +242,37 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
 
   const payload = useMemo(() => {
     const data = {
-      topic,
-      start_date: start,
-      end_date: end,
-      title,
-      intro: intro,
-      newsletter_type: newsletterType,
-      features: features.length > 0 ? features : undefined,
-      links: links.length > 0 ? links : undefined,
-      location: location || undefined,
-      content: content || undefined,
-      key_details: keyDetails || undefined,
-      tone: tone.length > 0 ? tone : undefined,
-      sections: sections === "" ? undefined : Number(sections),
-      preset: preset || undefined,
+      topic: object.topic,
+      start_date: object.start,
+      end_date: object.end,
+      title: object.title,
+      intro: object.intro,
+      newsletter_type: object.newsletterType,
+      features: object.features.length > 0 ? object.features : undefined,
+      links: object.links.length > 0 ? object.links : undefined,
+      location: object.location || undefined,
+      content: object.content || undefined,
+      key_details: object.keyDetails || undefined,
+      tone: object.tone.length > 0 ? object.tone : undefined,
+      sections: object.sections === "" ? undefined : Number(object.sections),
+      preset: object.preset || undefined,
     };
     return data;
   }, [
-    topic,
-    start,
-    end,
-    title,
-    intro,
-    newsletterType,
-    features,
-    links,
-    location,
-    content,
-    keyDetails,
-    tone,
-    sections,
-    preset,
+    object.topic,
+    object.start,
+    object.end,
+    object.title,
+    object.intro,
+    object.newsletterType,
+    object.features,
+    object.links,
+    object.location,
+    object.content,
+    object.keyDetails,
+    object.tone,
+    object.sections,
+    object.preset,
   ]);
 
   const parse = Payload.safeParse(payload);
@@ -272,32 +289,37 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
 
   const applyPreset = useCallback((k: PresetKey) => {
     const p = NEWSLETTER_PRESETS[k];
-    setTitle(p.title);
-    setTopic(p.topic);
-    setIntro(p.intro);
-    setNewsletterType(p.newsletter_type);
-    setFeatures([...p.features]);
-    setTone([...p.tone]);
-    setSections(p.sections);
-    setPreset(k);
+    setObject({
+      ...object,
+      title: p.title,
+      topic: p.topic,
+      intro: p.intro,
+      newsletterType: p.newsletter_type,
+      features: [...p.features],
+      tone: [...p.tone],
+      sections: p.sections,
+      preset: k,
+    });
   }, []);
 
   const addFeature = () => {
     const v = newFeature.trim();
     if (!v) return;
-    if (!features.includes(v)) setFeatures([...features, v]);
+    if (!object.features.includes(v))
+      setObject({ ...object, features: [...object.features, v] });
     setNewFeature("");
   };
   const removeFeature = (v: string) =>
-    setFeatures(features.filter((f) => f !== v));
-
+    setObject({ ...object, features: object.features.filter((f) => f !== v) });
   const addTone = () => {
     const v = newTone.trim();
     if (!v) return;
-    if (!tone.includes(v)) setTone([...tone, v]);
+    if (!object.tone.includes(v))
+      setObject({ ...object, tone: [...object.tone, v] });
     setNewTone("");
   };
-  const removeTone = (v: string) => setTone(tone.filter((t) => t !== v));
+  const removeTone = (v: string) =>
+    setObject({ ...object, tone: object.tone.filter((t) => t !== v) });
 
   const addLink = () => {
     const v = newLink.trim();
@@ -305,29 +327,33 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
     try {
       const u = new URL(v);
       const normalized = u.toString();
-      if (!links.includes(normalized)) setLinks([...links, normalized]);
+      if (!object.links.includes(normalized))
+        setObject({ ...object, links: [...object.links, normalized] });
       setNewLink("");
     } catch {
       setError("Please enter a valid URL (https://…)");
     }
   };
-  const removeLink = (v: string) => setLinks(links.filter((l) => l !== v));
+  const removeLink = (v: string) =>
+    setObject({ ...object, links: object.links.filter((l) => l !== v) });
 
   const clearAll = () => {
-    setTopic("dev tools");
-    setStart("2025-01-15");
-    setEnd("2025-01-22");
-    setTitle("Weekly Dev Digest");
-    setIntro("Hand-picked updates for the week.");
-    setNewsletterType("");
-    setFeatures([]);
-    setLinks([]);
-    setLocation("");
-    setContent("");
-    setKeyDetails("");
-    setTone([]);
-    setSections("");
-    setPreset("");
+    setObject({
+      topic: "dev tools",
+      start: "2025-01-15",
+      end: "2025-01-22",
+      title: "Weekly Dev Digest",
+      intro: "Hand-picked updates for the week.",
+      newsletterType: "",
+      features: [],
+      links: [],
+      location: "",
+      content: "",
+      keyDetails: "",
+      tone: [],
+      sections: "",
+      preset: "",
+    });
     setError(null);
   };
 
@@ -430,7 +456,7 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
                     onClick={() => applyPreset(key)}
                     className={cn(
                       "group rounded-xl border p-3 text-left transition hover:shadow-sm",
-                      preset === key
+                      object.preset === key
                         ? "border-zinc-900"
                         : "border-zinc-200 hover:border-zinc-300"
                     )}
@@ -456,16 +482,22 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
               <div className="grid md:grid-cols-2 gap-4">
                 <Field label="Newsletter title" error={parseErrors.title}>
                   <Input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
+                    value={object.title}
+                    onChange={(e) =>
+                      setObject({ ...object, title: e.target.value })
+                    }
                     placeholder="Enter newsletter title"
+                    required
                   />
                 </Field>
                 <Field label="Topic / subject" error={parseErrors.topic}>
                   <Input
-                    value={topic}
-                    onChange={(e) => setTopic(e.target.value)}
+                    value={object.topic}
+                    onChange={(e) =>
+                      setObject({ ...object, topic: e.target.value })
+                    }
                     placeholder="e.g., technology, business, lifestyle"
+                    required
                   />
                 </Field>
               </div>
@@ -475,18 +507,22 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
                   hint="Optional"
                   error={parseErrors.newsletter_type}
                 >
-                  <select
-                    className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-[14px] text-zinc-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
-                    value={newsletterType}
-                    onChange={(e) => setNewsletterType(e.target.value)}
-                  >
-                    <option value="">Select type</option>
+                  <Select
+                    // className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-[14px] text-zinc-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+                    placeholder={object.newsletterType || "Select type"}
+                    // value={object.newsletterType}
+                    onChange={(value) =>
+                      setObject({ ...object, newsletterType: value })
+                    }
+                    options={NEWSLETTER_TYPES.map((t) => ({ label: t.charAt(0).toUpperCase() + t.slice(1), value: t }))}
+                  />
+                    {/* <option value="">Select type</option>
                     {NEWSLETTER_TYPES.map((t) => (
                       <option key={t} value={t}>
                         {t.charAt(0).toUpperCase() + t.slice(1)}
                       </option>
                     ))}
-                  </select>
+                  </select> */}
                 </Field>
                 <Field
                   label="Sections"
@@ -498,12 +534,14 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
                     min={2}
                     max={8}
                     placeholder="4"
-                    value={sections as number | ""}
+                    value={object.sections as number | ""}
                     onChange={(e) => {
                       const v = e.target.value;
-                      setSections(
-                        v === "" ? "" : Math.max(2, Math.min(8, Number(v)))
-                      );
+                      setObject({
+                        ...object,
+                        sections:
+                          v === "" ? "" : Math.max(2, Math.min(8, Number(v))),
+                      });
                     }}
                   />
                 </Field>
@@ -515,9 +553,12 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
               >
                 <textarea
                   className="min-h-[88px] w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-[14px] text-zinc-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
-                  value={intro}
-                  onChange={(e) => setIntro(e.target.value)}
+                  value={object.intro}
+                  onChange={(e) =>
+                    setObject({ ...object, intro: e.target.value })
+                  }
                   placeholder="Brief introduction or description"
+                  required
                 />
               </Field>
             </section>
@@ -534,20 +575,25 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
                   <div className="relative">
                     <Input
                       type="date"
-                      value={start}
-                      onChange={(e) => setStart(e.target.value)}
+                      value={object.start}
+                      onChange={(e) =>
+                        setObject({ ...object, start: e.target.value })
+                      }
                     />
-                    <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                    {/* <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" /> */}
                   </div>
                 </Field>
                 <Field label="End date" error={parseErrors.end_date}>
                   <div className="relative">
                     <Input
                       type="date"
-                      value={end}
-                      onChange={(e) => setEnd(e.target.value)}
+                      value={object.end}
+                      onChange={(e) =>
+                        setObject({ ...object, end: e.target.value })
+                      }
+                      
                     />
-                    <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                    {/* <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" /> */}
                   </div>
                 </Field>
               </div>
@@ -563,7 +609,13 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
                   hint="Select from common options or type your own and press Enter."
                 >
                   <div className="flex gap-2">
-                    <select
+                    <Select
+                      placeholder="Select a feature"
+                      // value={newFeature}
+                      onChange={(value) => setNewFeature(value)}
+                      options={FEATURE_OPTIONS.map((f) => ({ label: f.charAt(0).toUpperCase() + f.slice(1), value: f }))}
+                    />
+                    {/* <select
                       className="h-10 flex-1 rounded-md border border-zinc-200 bg-white px-3 text-[14px] text-zinc-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
                       value={newFeature}
                       onChange={(e) => setNewFeature(e.target.value)}
@@ -574,7 +626,7 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
                           {f}
                         </option>
                       ))}
-                    </select>
+                    </select> */}
                     <Button
                       type="button"
                       onClick={addFeature}
@@ -583,9 +635,9 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
                       <Plus className="h-4 w-4" /> Add
                     </Button>
                   </div>
-                  {features.length > 0 ? (
+                  {object.features.length > 0 ? (
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {features.map((f) => (
+                      {object.features.map((f) => (
                         <Chip
                           key={f}
                           text={f}
@@ -601,7 +653,13 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
                   hint="Multi-select; you can mix e.g. ‘concise’ + ‘warm’."
                 >
                   <div className="flex gap-2">
-                    <select
+                    <Select
+                      placeholder="Select a tone"
+                      // value={newTone}
+                      onChange={(value) => setNewTone(value)}
+                      options={TONE_OPTIONS.map((t) => ({ label: t.charAt(0).toUpperCase() + t.slice(1), value: t }))}
+                    />
+                    {/* <select
                       className="h-10 flex-1 rounded-md border border-zinc-200 bg-white px-3 text-[14px] text-zinc-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
                       value={newTone}
                       onChange={(e) => setNewTone(e.target.value)}
@@ -612,14 +670,14 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
                           {t}
                         </option>
                       ))}
-                    </select>
+                    </select> */}
                     <Button type="button" onClick={addTone} className="gap-1">
                       <Plus className="h-4 w-4" /> Add
                     </Button>
                   </div>
-                  {tone.length > 0 ? (
+                  {object.tone.length > 0 ? (
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {tone.map((t) => (
+                      {object.tone.map((t) => (
                         <Chip key={t} text={t} onRemove={() => removeTone(t)} />
                       ))}
                     </div>
@@ -635,8 +693,10 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
               <div className="grid md:grid-cols-2 gap-4">
                 <Field label="Location (optional)">
                   <Input
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
+                    value={object.location}
+                    onChange={(e) =>
+                      setObject({ ...object, location: e.target.value })
+                    }
                     placeholder="e.g., New York, Global"
                   />
                 </Field>
@@ -645,16 +705,20 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
               <Field label="Key details">
                 <textarea
                   className="min-h-[80px] w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-[14px] text-zinc-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
-                  value={keyDetails}
-                  onChange={(e) => setKeyDetails(e.target.value)}
+                  value={object.keyDetails}
+                  onChange={(e) =>
+                    setObject({ ...object, keyDetails: e.target.value })
+                  }
                   placeholder="Highlights, constraints, or must-include notes"
                 />
               </Field>
               <Field label="Additional content">
                 <textarea
                   className="min-h-[96px] w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-[14px] text-zinc-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
+                  value={object.content}
+                  onChange={(e) =>
+                    setObject({ ...object, content: e.target.value })
+                  }
                   placeholder="Any context or specific requirements"
                 />
               </Field>
@@ -683,9 +747,9 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
                   </Button>
                 </div>
               </Field>
-              {links.length > 0 ? (
+              {object.links.length > 0 ? (
                 <div className="flex flex-col gap-2">
-                  {links.map((l) => {
+                  {object.links.map((l) => {
                     const host = (() => {
                       try {
                         return new URL(l).hostname;
@@ -743,27 +807,27 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
               <div className="grid gap-2 text-[13px]">
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-500">Preset</span>
-                  <span>{preset || "—"}</span>
+                  <span>{object.preset || "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-500">Type</span>
-                  <span>{newsletterType || "—"}</span>
+                  <span>{object.newsletterType || "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-500">Sections</span>
-                  <span>{sections || "—"}</span>
+                  <span>{object.sections || "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-500">Features</span>
-                  <span>{features.length || 0}</span>
+                  <span>{object.features.length || 0}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-500">Tones</span>
-                  <span>{tone.length || 0}</span>
+                  <span>{object.tone.length || 0}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-500">Links</span>
-                  <span>{links.length || 0}</span>
+                  <span>{object.links.length || 0}</span>
                 </div>
               </div>
 

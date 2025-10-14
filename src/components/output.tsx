@@ -8,6 +8,13 @@ import LogCard from "./logs";
 import EnhancedLogCard from "./enhanced-logs";
 import { LogEntry } from "@/types/log";
 import ResultDocument from "./result-document";
+import { Stepper } from "./ui/stepper";
+
+const steps = [
+  { title: "Step 1", description: "Fill out the form" },
+  { title: "Step 2", description: "Review" },
+  { title: "Step 3", description: "Send email" },
+]
 
 const Output = () => {
   const [html, setHtml] = useState<string | null>(null);
@@ -19,11 +26,14 @@ const Output = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [sendSubject, setSendSubject] = useState("");
+  const [currentStep, setCurrentStep] = useState(0)
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">AI Newsletter Drafting Tool</h1>
-
+       <Stepper steps={steps} currentStep={currentStep} onStepChange={setCurrentStep} />
+    
+      {currentStep === 0 && (
       <RunAgentForm
         onRun={async (payload) => {
           setLoading(true);
@@ -57,6 +67,7 @@ const Output = () => {
               }
             }
             if (Array.isArray(json?.debug)) setLog(json.debug);
+            setCurrentStep(1);
           } catch (e: any) {
             setError(String(e?.message || e));
           } finally {
@@ -139,6 +150,7 @@ const Output = () => {
           }
         }}
       />
+      )}
 
       {loading && (
         <p className="mt-4 border rounded p-2 text-center">
@@ -147,7 +159,7 @@ const Output = () => {
       )}
       {error && <p className="mt-2 text-red-600">{error}</p>}
 
-      {html && (
+      {currentStep === 1 && html && (
         <ResultDocument
           html={html}
           setError={setError}
@@ -155,6 +167,9 @@ const Output = () => {
           setSendSubject={setSendSubject}
         />
       )}
+
+
+
 
       {enhancedLogs.length > 0 && (
         <div className="mt-6">
@@ -167,14 +182,14 @@ const Output = () => {
         </div>
       )}
 
-      {log.length > 0 && (
+      {/* {log.length > 0 && (
         <details className="mt-4">
           <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
             Legacy Debug Logs ({log.length} entries)
           </summary>
           <LogCard title="Agent Debug" logs={log} />
         </details>
-      )}
+      )} */}
     </div>
   );
 };
