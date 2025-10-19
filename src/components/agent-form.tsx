@@ -18,8 +18,12 @@ import {
   Calendar,
   Plus,
   RefreshCcw,
+  Palette,
+  Settings,
 } from "lucide-react";
 import Select from "./select";
+import Footer from "./footer";
+import ThemeCustomizer from "./theme-customizer";
 
 const Payload = z.object({
   topic: z.string().min(2, "Topic must be at least 2 characters"),
@@ -42,6 +46,28 @@ const Payload = z.object({
   tone: z.array(z.string()).optional(),
   sections: z.number().int().min(2, "Must be at least 2").max(8, "Must be at most 8").optional(),
   preset: z.string().optional(),
+  footer_details: z.object({
+    companyName: z.string().optional(),
+    address: z.string().optional(),
+    phone: z.string().optional(),
+    email: z.string().optional(),
+    website: z.string().optional(),
+    socialLinks: z.object({
+      twitter: z.string().optional(),
+      linkedin: z.string().optional(),
+      facebook: z.string().optional(),
+      instagram: z.string().optional(),
+    }).optional(),
+    copyright: z.string().optional(),
+    unsubscribeText: z.string().optional(),
+  }).optional(),
+  theme_colors: z.object({
+    primary: z.string().optional(),
+    secondary: z.string().optional(),
+    accent: z.string().optional(),
+    background: z.string().optional(),
+    foreground: z.string().optional(),
+  }).optional(),
 });
 
 type Props = {
@@ -144,7 +170,6 @@ const TONE_OPTIONS = [
   "authoritative",
 ] as const;
 
-// Small building blocks ---------------------------------
 const SectionTitle = ({
   title,
   description,
@@ -216,6 +241,28 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
     tone: [] as string[],
     sections: "" as number | "",
     preset: "",
+    footerDetails: {
+      companyName: "",
+      address: "",
+      phone: "",
+      email: "",
+      website: "",
+      socialLinks: {
+        twitter: "",
+        linkedin: "",
+        facebook: "",
+        instagram: "",
+      },
+      copyright: "",
+      unsubscribeText: "",
+    },
+    themeColors: {
+      primary: "#3b82f6",
+      secondary: "#64748b",
+      accent: "#f59e0b",
+      background: "#ffffff",
+      foreground: "#0f172a",
+    },
   });
   // const [topic, setTopic] = useState("dev tools");
   // const [start, setStart] = useState("2025-01-15");
@@ -256,6 +303,11 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
       tone: object.tone.length > 0 ? object.tone : undefined,
       sections: object.sections === "" ? undefined : Number(object.sections),
       preset: object.preset || undefined,
+      footer_details: Object.values(object.footerDetails).some(v => 
+        typeof v === 'string' ? v.trim() !== '' : 
+        typeof v === 'object' && v !== null ? Object.values(v).some(sv => typeof sv === 'string' && sv.trim() !== '') : false
+      ) ? object.footerDetails : undefined,
+      theme_colors: object.themeColors,
     };
     return data;
   }, [
@@ -273,6 +325,8 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
     object.tone,
     object.sections,
     object.preset,
+    object.footerDetails,
+    object.themeColors,
   ]);
 
   const parse = Payload.safeParse(payload);
@@ -353,6 +407,28 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
       tone: [],
       sections: "",
       preset: "",
+      footerDetails: {
+        companyName: "",
+        address: "",
+        phone: "",
+        email: "",
+        website: "",
+        socialLinks: {
+          twitter: "",
+          linkedin: "",
+          facebook: "",
+          instagram: "",
+        },
+        copyright: "",
+        unsubscribeText: "",
+      },
+      themeColors: {
+        primary: "#3b82f6",
+        secondary: "#64748b",
+        accent: "#f59e0b",
+        background: "#ffffff",
+        foreground: "#0f172a",
+      },
     });
     setError(null);
   };
@@ -790,6 +866,218 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
               ) : null}
             </section>
 
+            <Separator />
+
+            <section className="space-y-4">
+              <SectionTitle
+                title="Footer Details"
+                description="Add company information and contact details for the newsletter footer."
+              />
+              <div className="grid md:grid-cols-2 gap-4">
+                <Field label="Company Name">
+                  <Input
+                    value={object.footerDetails.companyName}
+                    onChange={(e) =>
+                      setObject({
+                        ...object,
+                        footerDetails: {
+                          ...object.footerDetails,
+                          companyName: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="Your Company Name"
+                  />
+                </Field>
+                <Field label="Email">
+                  <Input
+                    type="email"
+                    value={object.footerDetails.email}
+                    onChange={(e) =>
+                      setObject({
+                        ...object,
+                        footerDetails: {
+                          ...object.footerDetails,
+                          email: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="contact@company.com"
+                  />
+                </Field>
+                <Field label="Phone">
+                  <Input
+                    value={object.footerDetails.phone}
+                    onChange={(e) =>
+                      setObject({
+                        ...object,
+                        footerDetails: {
+                          ...object.footerDetails,
+                          phone: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="+1 (555) 123-4567"
+                  />
+                </Field>
+                <Field label="Website">
+                  <Input
+                    value={object.footerDetails.website}
+                    onChange={(e) =>
+                      setObject({
+                        ...object,
+                        footerDetails: {
+                          ...object.footerDetails,
+                          website: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="https://company.com"
+                  />
+                </Field>
+              </div>
+              <Field label="Address">
+                <textarea
+                  className="min-h-[80px] w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-[14px] text-zinc-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+                  value={object.footerDetails.address}
+                  onChange={(e) =>
+                    setObject({
+                      ...object,
+                      footerDetails: {
+                        ...object.footerDetails,
+                        address: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder="123 Main St, City, State 12345"
+                />
+              </Field>
+              <div className="grid md:grid-cols-2 gap-4">
+                <Field label="Twitter">
+                  <Input
+                    value={object.footerDetails.socialLinks.twitter}
+                    onChange={(e) =>
+                      setObject({
+                        ...object,
+                        footerDetails: {
+                          ...object.footerDetails,
+                          socialLinks: {
+                            ...object.footerDetails.socialLinks,
+                            twitter: e.target.value,
+                          },
+                        },
+                      })
+                    }
+                    placeholder="https://twitter.com/company"
+                  />
+                </Field>
+                <Field label="LinkedIn">
+                  <Input
+                    value={object.footerDetails.socialLinks.linkedin}
+                    onChange={(e) =>
+                      setObject({
+                        ...object,
+                        footerDetails: {
+                          ...object.footerDetails,
+                          socialLinks: {
+                            ...object.footerDetails.socialLinks,
+                            linkedin: e.target.value,
+                          },
+                        },
+                      })
+                    }
+                    placeholder="https://linkedin.com/company/company"
+                  />
+                </Field>
+                <Field label="Facebook">
+                  <Input
+                    value={object.footerDetails.socialLinks.facebook}
+                    onChange={(e) =>
+                      setObject({
+                        ...object,
+                        footerDetails: {
+                          ...object.footerDetails,
+                          socialLinks: {
+                            ...object.footerDetails.socialLinks,
+                            facebook: e.target.value,
+                          },
+                        },
+                      })
+                    }
+                    placeholder="https://facebook.com/company"
+                  />
+                </Field>
+                <Field label="Instagram">
+                  <Input
+                    value={object.footerDetails.socialLinks.instagram}
+                    onChange={(e) =>
+                      setObject({
+                        ...object,
+                        footerDetails: {
+                          ...object.footerDetails,
+                          socialLinks: {
+                            ...object.footerDetails.socialLinks,
+                            instagram: e.target.value,
+                          },
+                        },
+                      })
+                    }
+                    placeholder="https://instagram.com/company"
+                  />
+                </Field>
+              </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <Field label="Copyright">
+                  <Input
+                    value={object.footerDetails.copyright}
+                    onChange={(e) =>
+                      setObject({
+                        ...object,
+                        footerDetails: {
+                          ...object.footerDetails,
+                          copyright: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="Company Name. All rights reserved."
+                  />
+                </Field>
+                <Field label="Unsubscribe Text">
+                  <Input
+                    value={object.footerDetails.unsubscribeText}
+                    onChange={(e) =>
+                      setObject({
+                        ...object,
+                        footerDetails: {
+                          ...object.footerDetails,
+                          unsubscribeText: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="Unsubscribe from these emails"
+                  />
+                </Field>
+              </div>
+            </section>
+
+            <Separator />
+
+            <section className="space-y-4">
+              <SectionTitle
+                title="Theme Customization"
+                description="Customize the colors and appearance of your newsletter."
+              />
+              <ThemeCustomizer
+                onThemeChange={useCallback((colors) => {
+                  setObject(prev => ({
+                    ...prev,
+                    themeColors: colors,
+                  }));
+                }, [])}
+                initialColors={object.themeColors}
+              />
+            </section>
+
             {error ? (
               <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
                 {error}
@@ -828,6 +1116,20 @@ const RunAgentForm = ({ onRun, onStreamRun }: Props) => {
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-500">Links</span>
                   <span>{object.links.length || 0}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-500">Footer</span>
+                  <span>{object.footerDetails.companyName ? "✓" : "—"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-500">Theme</span>
+                  <span className="flex items-center gap-1">
+                    <div
+                      className="w-3 h-3 rounded"
+                      style={{ backgroundColor: object.themeColors.primary }}
+                    />
+                    Custom
+                  </span>
                 </div>
               </div>
 

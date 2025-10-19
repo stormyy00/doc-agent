@@ -1,10 +1,37 @@
 import React, { useState } from "react";
+import Footer from "./footer";
+
+interface FooterDetails {
+  companyName?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  socialLinks?: {
+    twitter?: string;
+    linkedin?: string;
+    facebook?: string;
+    instagram?: string;
+  };
+  copyright?: string;
+  unsubscribeText?: string;
+}
+
+interface ThemeColors {
+  primary: string;
+  secondary: string;
+  accent: string;
+  background: string;
+  foreground: string;
+}
 
 interface ResultDocumentProps {
   html: string;
   sendSubject: string;
   setSendSubject: (value: string) => void;
   setError: (error: string | null) => void;
+  footerDetails?: FooterDetails;
+  themeColors?: ThemeColors;
 }
 
 const ResultDocument = ({
@@ -12,13 +39,59 @@ const ResultDocument = ({
   setError,
   sendSubject,
   setSendSubject,
+  footerDetails,
+  themeColors,
 }: ResultDocumentProps) => {
   const [sendTo, setSendTo] = useState("");
   const [sending, setSending] = useState(false);
+
+  // Apply theme colors to the HTML
+  const styledHtml = themeColors ? `
+    <style>
+      :root {
+        --primary: ${themeColors.primary};
+        --secondary: ${themeColors.secondary};
+        --accent: ${themeColors.accent};
+        --background: ${themeColors.background};
+        --foreground: ${themeColors.foreground};
+      }
+      body {
+        background-color: ${themeColors.background};
+        color: ${themeColors.foreground};
+      }
+      .primary { color: ${themeColors.primary}; }
+      .bg-primary { background-color: ${themeColors.primary}; }
+      .border-primary { border-color: ${themeColors.primary}; }
+      .accent { color: ${themeColors.accent}; }
+      .bg-accent { background-color: ${themeColors.accent}; }
+      a { color: ${themeColors.primary}; }
+      h1, h2, h3, h4, h5, h6 { color: ${themeColors.foreground}; }
+      .btn-primary {
+        background-color: ${themeColors.primary};
+        color: ${themeColors.background};
+        border: 1px solid ${themeColors.primary};
+      }
+      .btn-secondary {
+        background-color: transparent;
+        color: ${themeColors.primary};
+        border: 1px solid ${themeColors.primary};
+      }
+    </style>
+    ${html}
+  ` : html;
+
   return (
     <>
       <h2 className="text-xl font-semibold mt-6">Preview</h2>
-      <iframe className="w-full h-[600px] border mt-2" srcDoc={html} />
+      <iframe className="w-full h-[600px] border mt-2" srcDoc={styledHtml} />
+      
+      {/* Footer Preview */}
+      {footerDetails && (
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold mb-4">Footer Preview</h3>
+          <Footer details={footerDetails} showFooter={true} />
+        </div>
+      )}
 
       <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
         <div>

@@ -17,6 +17,7 @@ import {
   rewriteTone,
 } from "@/utils/writer";
 import { createLogger } from "@/utils/logger";
+import { generateFooterHTML, applyThemeColors } from "@/utils/footer-theme";
 
 // export const dynamic = "force-dynamic";
 
@@ -43,6 +44,29 @@ const BodySchema = z
     // single-article seed (optional)
     article_url: z.string().url().optional(),
     article_html: z.string().optional(),
+    // Footer and theme customization
+    footer_details: z.object({
+      companyName: z.string().optional(),
+      address: z.string().optional(),
+      phone: z.string().optional(),
+      email: z.string().optional(),
+      website: z.string().optional(),
+      socialLinks: z.object({
+        twitter: z.string().optional(),
+        linkedin: z.string().optional(),
+        facebook: z.string().optional(),
+        instagram: z.string().optional(),
+      }).optional(),
+      copyright: z.string().optional(),
+      unsubscribeText: z.string().optional(),
+    }).optional(),
+    theme_colors: z.object({
+      primary: z.string().optional(),
+      secondary: z.string().optional(),
+      accent: z.string().optional(),
+      background: z.string().optional(),
+      foreground: z.string().optional(),
+    }).optional(),
   })
   .superRefine((v, ctx) => {
     if (v.start_date && v.end_date && v.start_date > v.end_date) {
@@ -308,12 +332,36 @@ export const POST = async (req: NextRequest) => {
           prompt += `. Use ${args.preset ?? data.preset} preset style and structure`;
         }
 
+        // Build theme-aware system prompt
+        let systemPrompt = [
+          "You are a professional newsletter writer. Create a complete, well-structured HTML newsletter document with proper styling, sections, and engaging content.",
+          "Do NOT include any legal disclaimers, unsubscribe links, or footers in the body. A custom footer is appended automatically downstream.",
+        ];
+        
+        // Add theme information if provided
+        if (data.theme_colors) {
+          const { primary, secondary, accent, background, foreground } = data.theme_colors;
+          systemPrompt.push(
+            `IMPORTANT: This newsletter will use a custom theme with the following colors:`,
+            `- Primary: ${primary || '#3b82f6'}`,
+            `- Secondary: ${secondary || '#64748b'}`,
+            `- Accent: ${accent || '#f59e0b'}`,
+            `- Background: ${background || '#ffffff'}`,
+            `- Foreground: ${foreground || '#0f172a'}`,
+            `Use these colors in your HTML styling and ensure the design is cohesive with this color scheme.`
+          );
+        }
+        
+        if (data.footer_details) {
+          const { companyName } = data.footer_details;
+          if (companyName) {
+            systemPrompt.push(`This newsletter is for ${companyName}. Tailor the content and tone appropriately for this organization.`);
+          }
+        }
+
         const r = await generateText({
           model,
-          system: [
-            "You are a professional newsletter writer. Create a complete, well-structured HTML newsletter document with proper styling, sections, and engaging content.",
-            "Do NOT include any legal disclaimers, unsubscribe links, or footers in the body. A standard/custom footer is appended automatically downstream.",
-          ].join("\n"),
+          system: systemPrompt.join("\n"),
           prompt,
           temperature: 0.4,
         });
@@ -324,16 +372,20 @@ export const POST = async (req: NextRequest) => {
           r.text.match(/<!doctype html[\s\S]*<\/html>/i) ||
           r.text.match(/<html[\s\S]*<\/html>/i);
         let html = (htmlMatch ? htmlMatch[0] : r.text).trim();
-        // Append custom footer if missing
-        try {
-          const { html: footerHtml } = await toolGetFooter();
+        
+        // Apply theme colors first
+        html = applyThemeColors(html, data.theme_colors);
+        
+        // Append custom footer if provided
+        if (data.footer_details) {
+          const footerHtml = generateFooterHTML(data.footer_details, data.theme_colors);
           if (footerHtml) {
             const hasFooter = /<footer[\s>]/i.test(html);
             if (!hasFooter) {
               html = html.replace(/<\/body>/i, `${footerHtml}\n</body>`);
             }
           }
-        } catch {}
+        }
         const out = { html };
         logger.toolResult("write_newsletter", { html_len: html.length }, toolId, true);
         return out;
@@ -391,15 +443,40 @@ export const POST = async (req: NextRequest) => {
 
   // ---- run planner ----
   logger.step("planner:start");
+  // Build system prompt with theme and footer context
+  let systemPrompt = [
+    "You are a professional newsletter agent that creates high-quality newsletters.",
+    "Default to calling write_newsletter(...) exactly once to produce the final HTML.",
+    "You may call generate_email(...) if items or pre-drafted sections are provided.",
+    "The footer is automatically appended when rendering emails using the provided footer details.",
+    "Never finish without returning an HTML document.",
+  ];
+  
+  // Add theme context if provided
+  if (data.theme_colors) {
+    const { primary, secondary, accent, background, foreground } = data.theme_colors;
+    systemPrompt.push(
+      `IMPORTANT: Use the custom theme colors provided:`,
+      `- Primary: ${primary || '#3b82f6'}`,
+      `- Secondary: ${secondary || '#64748b'}`,
+      `- Accent: ${accent || '#f59e0b'}`,
+      `- Background: ${background || '#ffffff'}`,
+      `- Foreground: ${foreground || '#0f172a'}`,
+      `Ensure the newsletter design is cohesive with this color scheme.`
+    );
+  }
+  
+  // Add footer context if provided
+  if (data.footer_details) {
+    const { companyName } = data.footer_details;
+    if (companyName) {
+      systemPrompt.push(`This newsletter is for ${companyName}. Tailor the content appropriately for this organization.`);
+    }
+  }
+
   const result = await generateText({
     model,
-    system: [
-      "You are a professional newsletter agent that creates high-quality newsletters.",
-      "Default to calling write_newsletter(...) exactly once to produce the final HTML.",
-      "You may call generate_email(...) if items or pre-drafted sections are provided.",
-      "You can call get_footer() to view the current footer and set_footer() if the user wants to customize it; the footer is automatically appended when rendering emails.",
-      "Never finish without returning an HTML document.",
-    ].join("\n"),
+    system: systemPrompt.join("\n"),
     messages: [{
       role: "user",
       content: `Create a comprehensive, data-driven newsletter about ${data.topic} for ${data.start_date || "(no start)"} to ${data.end_date || "(no end)"} titled ${data.title}.` +
@@ -413,7 +490,9 @@ export const POST = async (req: NextRequest) => {
         (data.content ? ` Additional content context: ${data.content}.` : "") +
         (data.links && data.links.length > 0 ? ` Include these relevant links: ${data.links.join(", ")}.` : "") +
         (data.preset ? ` Use ${data.preset} preset style and structure.` : "") +
-        (data.article_url ? ` Also include content from: ${data.article_url}` : ""),
+        (data.article_url ? ` Also include content from: ${data.article_url}` : "") +
+        (data.theme_colors ? ` Use the custom theme colors provided (primary: ${data.theme_colors.primary || '#3b82f6'}, etc.) in your HTML styling.` : "") +
+        (data.footer_details?.companyName ? ` This newsletter is for ${data.footer_details.companyName}.` : ""),
     }],
     tools,
     temperature: 0.2,
@@ -474,6 +553,21 @@ export const POST = async (req: NextRequest) => {
         end_date: data.end_date,
       });
       html = direct.html;
+      
+      // Apply theme colors and footer to direct writer output
+      if (html) {
+        html = applyThemeColors(html, data.theme_colors);
+        if (data.footer_details) {
+          const footerHtml = generateFooterHTML(data.footer_details, data.theme_colors);
+          if (footerHtml) {
+            const hasFooter = /<footer[\s>]/i.test(html);
+            if (!hasFooter) {
+              html = html.replace(/<\/body>/i, `${footerHtml}\n</body>`);
+            }
+          }
+        }
+      }
+      
       logger.info("guardrail:writer:ok", { html_len: html?.length ?? 0 });
     } catch (e) {
       logger.error("guardrail:writer:failed", { err: String(e) });

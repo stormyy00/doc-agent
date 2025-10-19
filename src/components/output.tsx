@@ -26,7 +26,9 @@ const Output = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [sendSubject, setSendSubject] = useState("");
-  const [currentStep, setCurrentStep] = useState(0)
+  const [currentStep, setCurrentStep] = useState(0);
+  const [footerDetails, setFooterDetails] = useState<any>(null);
+  const [themeColors, setThemeColors] = useState<any>(null);
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -43,6 +45,8 @@ const Output = () => {
           setEnhancedLogs([]);
           setLogStats(null);
           setTotalDuration(null);
+          setFooterDetails(payload.footer_details || null);
+          setThemeColors(payload.theme_colors || null);
           try {
             const res = await fetch("/api/agent", {
               method: "POST",
@@ -82,6 +86,8 @@ const Output = () => {
           setEnhancedLogs([]);
           setLogStats(null);
           setTotalDuration(null);
+          setFooterDetails(payload.footer_details || null);
+          setThemeColors(payload.theme_colors || null);
 
           try {
             const res = await fetch("/api/agent/stream", {
@@ -165,6 +171,8 @@ const Output = () => {
           setError={setError}
           sendSubject={sendSubject}
           setSendSubject={setSendSubject}
+          footerDetails={footerDetails}
+          themeColors={themeColors}
         />
       )}
 
